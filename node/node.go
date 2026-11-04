@@ -20,6 +20,7 @@ type Node struct {
 	ReplyCount int
 	PeerCount int
 	mu sync.Mutex
+	ReplyChans map[int32]chan bool //map to hold channels for each peer to signal when a reply is received
 }
 
 func NewNode(id int32, peerCount int) *Node {
@@ -30,6 +31,7 @@ func NewNode(id int32, peerCount int) *Node {
 		DeferredQueue: make([]int32, 0),
 		ReplyCount:    0,
 		PeerCount:     peerCount,
+		ReplyChans: make(map[int32]chan bool), // Initialize the map for reply channels
 	}
 }
 
@@ -75,11 +77,15 @@ func (n *Node) ShouldDefer(requestingID int32, requestingTimestamp int64) bool {
 	return false
 }
 
-func (n *Node) DeferReply(nodeID int32) {
+func (n *Node) DeferReply(nodeID int32) chan bool {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
+	//make a channel for the node to wait on, and store it in the map
 	n.DeferredQueue = append(n.DeferredQueue, nodeID)
+	ch := make(chan bool)
+	n.ReplyChans[nodeID] = ch //store the channel
+	return ch //return the channel
 }
 		
 func (n *Node) RequestCS() int64{
@@ -106,6 +112,13 @@ func (n *Node) ReleaseCS() []int32 {
 	n.State = RELEASED //set state back to released
 	deferred := n.DeferredQueue //grab the list of deferred nodes waiting for a reply
 	n.DeferredQueue = make([]int32, 0) //clear the deferred queue
+	
+	for _, nodeID := range deferred {
+		if ch, ok := n.ReplyChans[nodeID]; ok {
+			ch <- true //sends true to the channel to signal that the node can proceed
+			delete(n.ReplyChans, nodeID) //remove the channel from the map
+		}
+	}	
 	return deferred //return the list so we can send a reply to them
 }
 
@@ -117,3 +130,4 @@ func (n *Node) ReceiveReply() bool{
 
 	return n.ReplyCount >= n.PeerCount //return true if we've received replies from all peers, false otherwise
 }
+
