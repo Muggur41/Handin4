@@ -19,7 +19,9 @@ func (s *Server) RequestAccess(ctx context.Context, req *proto.Request) (*proto.
 
 	if s.Node.ShouldDefer(req.NodeId, req.Timestamp) {
 		log.Printf("Deffering request from node %d", req.NodeId)
-		s.Node.DeferReply(req.NodeId) //will reply later when I release
+		ch := s.Node.DeferReply(req.NodeId) //will reply later when I release
+		<-ch //wait for the signal to reply
+		log.Printf("now replying to deffered node %d", req.NodeId)
 	} else {
 		log.Printf("Sending reply to node %d", req.NodeId)
 	}
