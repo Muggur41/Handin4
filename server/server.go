@@ -12,4 +12,17 @@ type Server struct {
 	Node *node.Node	//pointer to node
 }
 
+func (s *Server) RequestAccess(ctx context.Context, req *proto.Request) (*proto.Reply, error) {
+	log.Printf("Received request from node %d with timestamp %d", req.NodeId, req.Timestamp)
+	
+	s.Node.UpdateTimestamp(req.Timestamp) 
+
+	if s.Node.ShouldDefer(req.NodeId, req.Timestamp) {
+		log.Printf("Deffering request from node %d", req.NodeId)
+		s.Node.DeferReply(req.NodeId) //will reply later when I release
+	} else {
+		log.Printf("Sending reply to node %d", req.NodeId)
+	}
+	return &proto.Reply{NodeId: s.Node.ID}, nil
+}
 
