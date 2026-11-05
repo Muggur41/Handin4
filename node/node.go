@@ -57,11 +57,11 @@ func (n *Node) ShouldDefer(requestingID int32, requestingTimestamp int64) bool {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	// 1. If we're in HELD -> defer (make them wait)
-	// 2. If we're in WANTED (also requesting):
+	// 1. If in HELD -> defer (make them wait)
+	// 2. If in WANTED (also requesting):
 	//   - + our timestamp is lower -> we have priority -> defer
 	//   - + same timestamp but our ID is lower -> we have priority -> defer
-	// 3. Otherwise -> reply immediately (let them in)
+	// 3. Otherwise -> reply immediately (let in)
 
 	if n.State == HELD {
 		return true
