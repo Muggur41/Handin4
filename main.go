@@ -11,6 +11,7 @@ package main
   	"strings"
   	"time"
 	"fmt"
+	"sync"
 
   	"google.golang.org/grpc"
   )
@@ -41,22 +42,31 @@ func main() {
   	timestamp := n.RequestCS()
 
   	// Send request to all peers
+  	  	// Send request to all peers and wait for replies
+  	var wg sync.WaitGroup
   	for _, peer := range peerList {
+  		wg.Add(1)
   		go func(addr string) {
+  			defer wg.Done()
   			client.SendRequest(addr, int32(*id), timestamp)
-  			if n.ReceiveReply() {
-  				log.Printf("Node %d received all replies, entering critical section", *id)
-  				n.EnterCS()
-
-  				// Critical section, just print something
-  				log.Printf(">>> Node %d is IN the critical section <<<", *id)
-  				time.Sleep(3 * time.Second)
-  				log.Printf(">>> Node %d is LEAVING the critical section <<<", *id)
-
-  				n.ReleaseCS()
-  			}
+  			n.ReceiveReply()
   		}(peer)
   	}
+  	wg.Wait()
+
+  	// Now we have all replies, enter critical section
+  	log.Printf("Node %d received all replies, entering critical section", *id)
+  	n.EnterCS()
+
+  	// Critical section, just print something
+  	log.Printf(">>> Node %d is IN the critical section <<<", *id)
+  	time.Sleep(3 * time.Second)
+  	log.Printf(">>> Node %d is LEAVING the critical section <<<", *id)
+
+  	n.ReleaseCS()
+
+  	// Keep the program running
+  	select {}
 
   	// Keep the program running
   	select {}
